@@ -17,8 +17,22 @@ source qp_env/bin/activate
 ```
 pip3 install -r requirements.txt
 ```
-4. Connect to your postges-compatible database and execute the DDL necessary to construct the tables used by this little application:
+4. Connect to your postgres-compatible database and execute the DDL necessary to construct the tables used by this little application:
 ![ERD.png](./ERD.png)
+
+### FYI: Initial Data for this mini-app can be loaded using the sql commandline client provided with cockroachdb in the following manner: (assumes you started cockroachdb in insecure mode and are in the same directory as this readme and the datasetup.sql file)
+```
+$ cockroach sql --insecure --user=root --host=localhost --database=defaultdb -f datasetup.sql
+```
+### how to start a local single instance of cockroachdb suitable for lightweight testing/dev work:  (add a space and an ampersand at the end of the command if you want it to run in the background)
+```
+cockroach start-single-node \
+  --insecure \
+  --listen-addr=localhost:26257 \
+  --http-addr=localhost:8080
+```
+
+
 ### DDL, data model, and sample SQL for this mini-app is provided below:
 ``` 
 -- the following statements can be executed from any SQL client for example you may use psql: (replace your user, port and host values to match your environment)
