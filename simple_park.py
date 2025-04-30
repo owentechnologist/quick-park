@@ -45,7 +45,11 @@ class QuickPark:
         port = db_url.port
         application_name="quick_park_demo"
         port = str(port)
-        self.conn_string = f"dbname={dbname} user={user} host={host} port={port} application_name={application_name}"
+        if password =='':
+            self.conn_string = f"dbname={dbname} user={user} host={host} port={port} application_name={application_name}"
+        else:
+            self.conn_string = f"dbname={dbname} user={user} password={password} host={host} port={port} application_name={application_name}"
+        
         self.pool = ConnectionPool(self.conn_string, min_size=args.minpoolsize, max_size=args.maxpoolsize)
 
     ## this function displays the commandline menu to the user
