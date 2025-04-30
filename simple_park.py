@@ -2,7 +2,6 @@ import logging
 import os
 import random
 import time
-import uuid
 import threading
 from argparse import ArgumentParser, RawTextHelpFormatter
 import psycopg
@@ -20,6 +19,7 @@ import urllib.parse as urlparse
 # -v (for debug-level logging) 
 # -min <minimum-number-of-pooled-connections>
 # -max <maximum-number-of-pooled-connections>
+# -ltms <acceptable_latency_in_millis>
 # sample start command: (after ensuring the URL is set in the env)
 # python3 qp_app.py -v -min 2 -max 8
 class QuickPark:
@@ -29,9 +29,11 @@ class QuickPark:
         parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose/logging output to screen")
         parser.add_argument("--minpoolsize", "-min", type=int, default=2, help="What is minimum size of connection Pool to DB?")
         parser.add_argument("--maxpoolsize", "-max", type=int, default=20, help="What is maximum size of connection Pool to DB?")
+        parser.add_argument("--latencythresholdms", "-ltms", type=int, default=1000, help="Below this threashold in milliseconds no need to log latency for SQL activities.")
         
         args = parser.parse_args()
         self.verbose = args.verbose
+        self.latency_threshold_millis = args.latencythresholdms
         
         logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO)
         logging.info(f"ARGS set to: verbose == {self.verbose}")
@@ -170,7 +172,9 @@ class QuickPark:
     def do_loop(self,thread_name,count):
         print(f"{thread_name} --> STARTING LOOP ")
         x=0 
+        
         while x<count:
+            start_time=int(time.time() * 1000)
             x+=1
             # wrapping function call in retry logic:
             self.handle_errors(lambda _: self.make_reservation())
@@ -179,7 +183,8 @@ class QuickPark:
             if x%2==0:
                 self.cancel_parking_reservation()
                 time.sleep(0.025) # sleep for 25 millis 
-
+            if (int(time.time() * 1000) > start_time+self.latency_threshold_millis):
+                logging.warning(f'Loop iteration took {int(time.time() * 1000) - start_time} ms')
     #this loop will end when exit_event is set
     def spot_check_loop(self):
         while not self.exit_event.is_set():
@@ -246,15 +251,15 @@ class QuickPark:
                 lamfun(self)
                 retry_flag = False
             except SerializationFailure as e:
-                logging.info(f"{int(time.time() * 1000)} SerializationFailure . . .\n{e}")
+                logging.error(f"{int(time.time() * 1000)} SerializationFailure . . .\n{e}")
                 retry_count+=1
                 time.sleep(.1) # sleep for 100 millis
             except psycopg.errors.UniqueViolation as e:
-                logging.info(f"{int(time.time() * 1000)} UniqueViolation . . .\n{e}")
+                logging.error(f"{int(time.time() * 1000)} UniqueViolation . . .\n{e}")
                 retry_count+=1
                 time.sleep(.525) # sleep for 525 millis
             except Exception as e:
-                logging.warn(f"{int(time.time() * 1000)} Unexpected Exception: {e}")
+                logging.error(f"{int(time.time() * 1000)} Unexpected Exception: {e}")
                 retry_count=3
 
 def main():

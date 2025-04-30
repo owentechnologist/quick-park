@@ -125,7 +125,7 @@ export DATABASE_URL='postgresql://root@192.168.1.20:26000/quick_park?sslmode=dis
 ```
 6. Execute the simple_park.py code from the project directory.
 ```
-(qp_env) devload@devload quick_park % python3 simple_park.py -v -min 3 -max 5
+(qp_env) devload@devload quick_park % python3 simple_park.py -v -min 3 -max 5 -ltms 3000
 ```
 
 |                                   argument                                     |                    explanation                          |
@@ -133,5 +133,6 @@ export DATABASE_URL='postgresql://root@192.168.1.20:26000/quick_park?sslmode=dis
 | -v                                              | turns on verbose logging (debug level)         |
 | -min <some-number>                                          | change minimum # of connections in db pool (defaults to 2) |
 | -max <some-number>                                | change maximum # of connections in db pool (defaults to 20)|
+| -ltms <some-number> (defaults to 1000)             | latency threshold in milliseconds: below which, no performance-related logging occurs |
 
 
