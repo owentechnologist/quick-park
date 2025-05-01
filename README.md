@@ -81,7 +81,7 @@ select * from quick_park.parking_spot_alert;
 
 5. Provide the url to your database as an env variable: (adjust your username, hostname, port, database name as is appropriate)
 ```
-export DATABASE_URL='postgresql://root@localhost:26257/quick_park?sslmode=insecure'
+export DATABASE_URL='postgresql://root@localhost:26257/quick_park?sslmode=insecure&application_name=QuickPark'
 ```
 6. Execute the simple_park.py code from the project directory.
 ```
@@ -104,7 +104,10 @@ export DATABASE_URL='postgresql://root@localhost:26257/quick_park?sslmode=insecu
 
 ### If you choose to run multiple threads in the loop option offered, you are likely to encounter an occasional exception caused by either: 
 1. a duplicate license plate number used when reserving a parking spot (caused by the application using some randomness in its generation of license plate numbers)
-2. a failure of a TX (transaction) due to attempts by multiple threads to update the same row 
+2. a failure of a TX (transaction) due to attempts by multiple threads to update the same row Potential Causes for such exceptions are in general: contention / resource exhaustion / clock issues in distributed SQL
+
+## See the following github for expert guidance on understanding contention and possible avoidance of errors
+[Cockroachdb runbook](https://github.com/cockroachlabs/cockroachdb-runbook-template/blob/main/diagnostic-support/troubleshooting-sql-contention.md) 
 
 ## sample execution:
 ```
