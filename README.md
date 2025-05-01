@@ -35,8 +35,7 @@ cockroach start-single-node \
 ### It may be helpful to read through the contents of the datasetup.sql file
 ### To understand the DDL / data model, and sample SQL for this mini-app
 
-### In addition to the commands in the datasetup.sql file
-### The following statements can be executed from any SQL client for example you may use psql: (replace your user, port and host values to match your environment)
+### In addition to the commands in the datasetup.sql file... The following statements can be executed from any SQL client for example you may use psql: (replace your user, port and host values to match your environment)
 
 ``` 
 psql -U root -p 26000 -h 192.168.1.20
@@ -82,7 +81,7 @@ select * from quick_park.parking_spot_alert;
 
 5. Provide the url to your database as an env variable: (adjust your username, hostname, port, database name as is appropriate)
 ```
-export DATABASE_URL='postgresql://root@192.168.1.20:26000/quick_park?sslmode=disable'
+export DATABASE_URL='postgresql://root@localhost:26257/quick_park?sslmode=insecure'
 ```
 6. Execute the simple_park.py code from the project directory.
 ```
@@ -92,8 +91,8 @@ export DATABASE_URL='postgresql://root@192.168.1.20:26000/quick_park?sslmode=dis
 |                                   argument                                     |                    explanation                          |
 | ------------------------------------------------------------------------------ | ------------------------------------------------------- |
 | -v                                              | turns on verbose logging (debug level)         |
-| -min <some-number>                                          | change minimum # of connections in db pool (defaults to 2) |
-| -max <some-number>                                | change maximum # of connections in db pool (defaults to 20)|
+| -min <some-number>                                          | set minimum # of connections in db pool (defaults to 2) |
+| -max <some-number>                                | set maximum # of connections in db pool (defaults to 20)|
 | -ltms <some-number> (defaults to 1000)             | latency threshold in milliseconds: below which, no performance-related logging occurs |
 
 
@@ -103,4 +102,101 @@ export DATABASE_URL='postgresql://root@192.168.1.20:26000/quick_park?sslmode=dis
 * loop (setup and run multiple threads that randomly fill and empty parking spots)
 * end (quit the program - cleaning up the connections used)
 
-### If you choose to run multiple threads in the loop option offered, you are likely to encounter an occassional exception caused by either a duplicate license plate number used when reserving a parking spot, or a failure of a TX (transaction) due to attempts by multiple threads to update the same row 
+### If you choose to run multiple threads in the loop option offered, you are likely to encounter an occasional exception caused by either: 
+1. a duplicate license plate number used when reserving a parking spot (caused by the application using some randomness in its generation of license plate numbers)
+2. a failure of a TX (transaction) due to attempts by multiple threads to update the same row 
+
+## sample execution:
+```
+(qp_env) owentaylor@Owens-MacBook-Pro quick-park % python3 simple_park.py -ltms 600 -min 10 -max 30
+INFO:root:ARGS set to: verbose == False
+
+**********************************************
+        Type: END   and hit enter to exit the program...
+
+        Commandline Instructions: 
+TYPE your preferred action from this list:
+(only hit enter for the purpose of submitting your selection)
+
+**********************************************
+
+Your Options:
+Make single reservation (mr)
+query parking space state (qs)
+loop with threads (loop)
+end program (END) :     qs
+
+  row   SPOTS_OF_TYPE  spot_id    type           available
+------------------------------------------------------------
+  1               4  3B          electric              True
+  2               4  3C          electric              True
+  3               4  1E          electric              True
+  4               4  3A          electric              True
+  5               4  2B          regular_car           False
+  6               4  1A          regular_car           True
+  7               4  2A          regular_car           True
+  8               4  1B          regular_car           True
+  9               2  1C          small_car             False
+ 10               2  1D          small_car             False
+ 11               2  2D          truck                 True
+ 12               2  2C          truck                 True
+
+        hit enter to continue...
+
+
+**********************************************
+        Type: END   and hit enter to exit the program...
+
+        Commandline Instructions: 
+TYPE your preferred action from this list:
+(only hit enter for the purpose of submitting your selection)
+
+**********************************************
+
+Your Options:
+Make single reservation (mr)
+query parking space state (qs)
+loop with threads (loop)
+end program (END) :     loop
+
+How many times should each thread loop? (25): 25
+How many threads to start? (2): 2
+INFO:root:1746118968958 Starting 2 threads with 25 iterations each...
+
+T H R E A D #0 --> STARTING LOOP 
+T H R E A D #1 --> STARTING LOOP 
+INFO:root:1746118969972 2 threads finished
+
+        hit enter to continue...
+
+
+**********************************************
+        Type: END   and hit enter to exit the program...
+
+        Commandline Instructions: 
+TYPE your preferred action from this list:
+(only hit enter for the purpose of submitting your selection)
+
+**********************************************
+
+Your Options:
+Make single reservation (mr)
+query parking space state (qs)
+loop with threads (loop)
+end program (END) :     qs
+
+  row   SPOTS_OF_TYPE  spot_id    type           available
+------------------------------------------------------------
+  1               4  3B          electric              True
+  2               4  3C          electric              True
+  3               4  1E          electric              True
+  4               4  3A          electric              True
+  5               4  2B          regular_car           False
+  6               4  1A          regular_car           False
+  7               4  2A          regular_car           False
+  8               4  1B          regular_car           False
+  9               2  1C          small_car             True
+ 10               2  1D          small_car             False
+ 11               2  2D          truck                 True
+ 12               2  2C          truck                 True
+```

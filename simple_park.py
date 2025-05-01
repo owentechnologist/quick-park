@@ -37,6 +37,11 @@ class QuickPark:
         
         logging.basicConfig(level=logging.DEBUG if self.verbose else logging.INFO)
         logging.info(f"ARGS set to: verbose == {self.verbose}")
+                # ANSI colors
+        self.GREEN = "\033[92m"
+        self.RED = "\033[91m"
+        self.RESET = "\033[0m"    
+
 
         env_url = os.environ.get("DATABASE_URL")
         db_url = urlparse.urlparse(env_url)
@@ -65,7 +70,7 @@ class QuickPark:
         print('(only hit enter for the purpose of submitting your selection)')
         print(spacer)
         # get user input/prompt/question:
-        user_text = input('\nYour Options:\n\tMake single reservation (mr), query parking space state (qs), loop with threads (loop), end program (END) :\t')
+        user_text = input('\nYour Options:\nMake single reservation (mr)\nquery parking space state (qs)\nloop with threads (loop)\nend program (END) :\t')
         if user_text.lower() =="end":
             print('\nYOU ENTERED --> \"END\" <-- QUITTING PROGRAM!!')
             exit(0)
@@ -84,7 +89,6 @@ class QuickPark:
         self.pool.putconn(conn)
     
     def show_parking_spot_data(self,row_count):
-            
         sql_query='''SELECT 
                 ROW_NUMBER() OVER(),
                 COUNT(pst.type) OVER(PARTITION BY pst.type) AS SPOTS_OF_TYPE,
@@ -100,8 +104,12 @@ class QuickPark:
                 cur.execute(sql_query,(row_count,))
                 rows = cur.fetchall()
                 if rows:
+                    print(f"{' row':>5}  {'SPOTS_OF_TYPE':>14}  {'spot_id':<9}  {'type':<13}  {'available':<5}")
+                    print("-" * 60)
                     for row in rows:
-                        print("row_number:{0} SPOTS_OF_TYPE: {1}, spot_id: {2}, type: {3}, available: {4}".format(row[0],row[1],row[2],row[3],row[4]))
+                        available = bool(row[4])
+                        available_str = f"{self.GREEN}True{self.RESET}" if available else f"{self.RED}False{self.RESET}"
+                        print(f"{row[0]:>3}  {row[1]:>14}  {row[2]:<10}  {row[3]:<10}  {available_str:<9}")
                 else:
                     print(f"No info on parking found")
         self.put_connection(conn) # return the connection OUTSIDE of the TX block
@@ -287,6 +295,8 @@ def main():
                 qp.start_x_threads(how_many,count)
             if (usr_action.strip().lower()!='mr') and (usr_action.strip().lower()!='qs') and (usr_action.strip().lower()!='loop'):
                 print(f"OPTION {usr_action} NOT IMPLEMENTED YET...")
+            
+            input('\n\thit enter to continue...\n')
     finally:
         print("CLEANING UP AS PROGRAM EXITS...")
         qp.stop()
