@@ -106,7 +106,7 @@ export DATABASE_URL='postgresql://root@localhost:26257/quick_park?sslmode=insecu
 1. a duplicate license plate number used when reserving a parking spot (caused by the application using some randomness in its generation of license plate numbers)
 2. a failure of a TX (transaction) due to attempts by multiple threads to update the same row Potential Causes for such exceptions are in general: contention / resource exhaustion / clock issues in distributed SQL
 
-## See the following github for expert guidance on understanding contention and possible avoidance of errors
+## See the following runbook in github for expert guidance on understanding contention and possible avoidance of errors
 [Cockroachdb runbook](https://github.com/cockroachlabs/cockroachdb-runbook-template/blob/main/diagnostic-support/troubleshooting-sql-contention.md) 
 
 ## sample execution:
