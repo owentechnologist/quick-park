@@ -90,9 +90,15 @@ class QuickPark:
     
     def show_parking_spot_data(self,row_count):
         sql_query='''SELECT 
-                ROW_NUMBER() OVER(),
+                ROW_NUMBER() OVER() AS row_num,
                 COUNT(pst.type) OVER(PARTITION BY pst.type) AS SPOTS_OF_TYPE,
-                ps.spot_id,pst.type,available
+                ps.spot_id,
+                pst.type,
+                ps.available,
+                CASE
+                    WHEN ps.reserve_end IS NULL THEN 'N/A'
+                    ELSE (now() - ps.reserve_end)::STRING
+                END AS time_left
                 FROM parking_spot ps
                 JOIN parking_spot_types pst
                 ON ps.type_id = pst.id
@@ -104,34 +110,35 @@ class QuickPark:
                 cur.execute(sql_query,(row_count,))
                 rows = cur.fetchall()
                 if rows:
-                    print(f"{' row':>5}  {'SPOTS_OF_TYPE':>14}  {'spot_id':<9}  {'type':<13}  {'available':<5}")
-                    print("-" * 60)
+                    print(f"{' row':>5}  {'#_TYPE':>7}  {'spot_id':>7}  {'type':<10}  {'available':<5} {'time_left':>13}")
+                    print("-" * 75)
                     for row in rows:
                         available = bool(row[4])
                         available_str = f"{self.GREEN}True{self.RESET}" if available else f"{self.RED}False{self.RESET}"
-                        print(f"{row[0]:>3}  {row[1]:>14}  {row[2]:<10}  {row[3]:<10}  {available_str:<9}")
+                        print(f"{row[0]:>3}  {row[1]:>7}  {row[2]:>7}  {row[3]:<10}  {available_str:<5} {row[5]:>15}")
                 else:
                     print(f"No info on parking found")
         self.put_connection(conn) # return the connection OUTSIDE of the TX block
 
     # gets connection from the pool:
-    def add_parking_reservation(self,license_plate, spot_type_id, duration_in_hours):
-        logging.debug(f"\nAdding reservation for {license_plate} {spot_type_id} {duration_in_hours}...")        
+    def add_parking_reservation(self,license_plate, spot_type_id, duration_in_minutes):
+        logging.debug(f"\nAdding reservation for {license_plate} {spot_type_id} for {duration_in_minutes} minutes...")        
         query = f'''WITH AvailableSpot AS (
-        SELECT ps.spot_id
+        SELECT ps.spot_id, ps.garage_id
         FROM parking_spot ps
         JOIN parking_spot_types pst ON ps.type_id = pst.id
         WHERE ps.available = true AND pst.id = %s
+        ORDER BY RANDOM()
         LIMIT 1
         FOR UPDATE
         )
         UPDATE parking_spot
         SET
         reserve_start = now(),
-        reserve_end = now() + INTERVAL '{duration_in_hours} hours',
+        reserve_end = now() + INTERVAL '{duration_in_minutes} minutes',
         available = false,
         license_plate_holding_reservation = %s
-        WHERE spot_id = (SELECT spot_id FROM AvailableSpot) AND available = true;'''
+        WHERE spot_id = (SELECT spot_id FROM AvailableSpot) AND garage_id = (SELECT garage_id FROM AvailableSpot)  AND available = true;'''
         
         conn = self.get_connection()
         with conn.transaction():
@@ -141,13 +148,15 @@ class QuickPark:
         self.put_connection(conn) # return the connection OUTSIDE of the TX block                
 
     # here we prepare the args for adding a reservation:
-    def make_reservation(self):
+    def make_reservation(self,how_many_minutes):
         logging.debug(f"Simulating Reservations (client behavior) --> :START")
         #license_plate, spot_type_id, duration_in_hours
         license_plate = 'NXT'+str(random.randint(1024,9999))
         spot_type_id = round(time.time()%4)
-        hours = round(time.time()%12)
-        self.add_parking_reservation(license_plate,spot_type_id,hours)
+        minutes=how_many_minutes
+        if(how_many_minutes==0):
+            minutes = round(random.randint(1,(12*60)))
+        self.add_parking_reservation(license_plate,spot_type_id,minutes)
         logging.debug("Simulating Reservation (client behavior) --> COMPLETED")  
     
     # now we see the need for a spot_reservation table!
@@ -159,6 +168,7 @@ class QuickPark:
         SELECT spot_id
         FROM parking_spot
         WHERE available = false
+        ORDER BY RANDOM()
         LIMIT 1
         FOR UPDATE
         )
@@ -185,14 +195,15 @@ class QuickPark:
             start_time=int(time.time() * 1000)
             x+=1
             # wrapping function call in retry logic:
-            self.handle_errors(lambda _: self.make_reservation())
-            # former code:        
-            #self.make_reservation()
-            if x%2==0:
-                self.cancel_parking_reservation()
+            self.handle_errors(lambda _: self.make_reservation(0))
+
+            if x%7==0:
+                # wrapping function call in retry logic:
+                self.handle_errors(lambda _: self.cancel_parking_reservation())
                 time.sleep(0.025) # sleep for 25 millis 
             if (int(time.time() * 1000) > start_time+self.latency_threshold_millis):
                 logging.warning(f'Loop iteration took {int(time.time() * 1000) - start_time} ms')
+    
     #this loop will end when exit_event is set
     def spot_check_loop(self):
         while not self.exit_event.is_set():
@@ -204,17 +215,17 @@ class QuickPark:
     # adds them to the parking_spot_alert table
     def spot_check(self):
         logging.debug("*** EXECUTING SPOT_CHECK FOR: quick_park.parking_spot_alert ***")
+        # this query should produce up to 2 alerts - one indicating expriry is false , 
+        # the other that it has expired (true)
         query = '''INSERT INTO quick_park.parking_spot_alert 
-        (reserve_end, spot_id, license_plate_holding_reservation, exceeded_time) 
-        SELECT reserve_end, spot_id, license_plate_holding_reservation, 
-        CASE WHEN reserve_end BETWEEN  now() - INTERVAL '10 minutes' AND now() THEN false 
-        WHEN reserve_end > now() THEN true 
-        ELSE false 
+        (reserve_end, spot_id, garage_id, license_plate_holding_reservation, exceeded_time) 
+        SELECT reserve_end, spot_id, garage_id, license_plate_holding_reservation, 
+        CASE WHEN reserve_end BETWEEN  now() - INTERVAL '10 minutes' AND now() - INTERVAL '10 seconds' THEN true 
+        WHEN reserve_end > now() - INTERVAL '10 seconds' THEN false 
         END
-        FROM quick_park.parking_spot 
-        WHERE reserve_end > now() - INTERVAL '10 minutes' 
-        AND reserve_end IS NOT NULL 
-        AND spot_id NOT IN (SELECT spot_id from quick_park.parking_spot_alert); 
+        FROM quick_park.parking_spot AS ps
+        WHERE reserve_end BETWEEN now() - INTERVAL '10 minutes' AND now() + INTERVAL '10 minutes'
+        ON CONFLICT (garage_id, spot_id, reserve_end, exceeded_time) DO NOTHING;
         '''
         conn = self.get_connection()
         with conn.transaction():
@@ -277,9 +288,10 @@ def main():
         while True:
             usr_action=qp.display_menu()
             if(usr_action.strip().lower()=='qs'):
-                qp.show_parking_spot_data(20) 
+                qp.show_parking_spot_data(100) 
             if(usr_action.strip().lower()=='mr'):
-                qp.make_reservation()
+                how_long_minutes = input('Please enter the number of minutes to be set for your parking reservation:  ')
+                qp.make_reservation(how_long_minutes)
             if(usr_action.strip().lower()=='loop'):
                 count=input("How many times should each thread loop? (25): ")
                 count=int(count)

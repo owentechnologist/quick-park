@@ -22,7 +22,7 @@ pip3 install -r requirements.txt
 
 ### FYI: Initial Data for this mini-app can be loaded using the sql commandline client provided with cockroachdb in the following manner: (assumes you started cockroachdb in insecure mode and are in the same directory as this readme and the datasetup.sql file)
 ```
-$ cockroach sql --insecure --user=root --host=localhost --database=defaultdb -f datasetup.sql
+cockroach sql --insecure --user=root --host=localhost --database=defaultdb -f datasetup.sql
 ```
 ### how to start a local single instance of cockroachdb suitable for lightweight testing/dev work:  (add a space and an ampersand at the end of the command if you want it to run in the background)
 ```
@@ -58,8 +58,8 @@ ON ps.type_id = pst.id;
 -- if a row exists and exceeded time is true: the reservation has been exceeded, and some action may be necessary (calling a tow truck?) 
 
 -- sample alert INSERT:
-INSERT INTO quick_park.parking_spot_alert (reserve_end, spot_id, license_plate_holding_reservation, exceeded_time) 
-SELECT reserve_end, spot_id, license_plate_holding_reservation, 
+INSERT INTO quick_park.parking_spot_alert (reserve_end, spot_id, garage_id license_plate_holding_reservation, exceeded_time) 
+SELECT reserve_end, spot_id, garage_id, license_plate_holding_reservation, 
 CASE WHEN reserve_end BETWEEN  now() - INTERVAL '10 minutes' AND now() THEN false 
   WHEN reserve_end < now() THEN true 
   ELSE false 
@@ -101,6 +101,14 @@ export DATABASE_URL='postgresql://root@localhost:26257/quick_park?sslmode=insecu
 * qs (query the parking spots for latest state)
 * loop (setup and run multiple threads that randomly fill and empty parking spots)
 * end (quit the program - cleaning up the connections used)
+
+### you can also start a separate process that connects to CRDB and listens for changes to the parking_spot_alert table:
+```
+cockroach sql --insecure --user=root --host=localhost --database=defaultdb
+SET CLUSTER SETTING kv.rangefeed.enabled = true;
+use quick_park;
+CREATE CHANGEFEED FOR TABLE parking_spot_alert WITH cursor='now()';
+```
 
 ### If you choose to run multiple threads in the loop option offered, you are likely to encounter an occasional exception caused by either: 
 1. a duplicate license plate number used when reserving a parking spot (caused by the application using some randomness in its generation of license plate numbers)
