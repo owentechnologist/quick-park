@@ -3,11 +3,10 @@ import os
 import random
 import time
 import threading
-from argparse import ArgumentParser, RawTextHelpFormatter
+from argparse import ArgumentParser
 import psycopg
-from psycopg.errors import SerializationFailure, Error
+from psycopg.errors import SerializationFailure
 from psycopg_pool import ConnectionPool
-from collections import namedtuple
 import urllib.parse as urlparse
 
 # this example expects the db url to be set in the runtime environment
@@ -97,7 +96,7 @@ class QuickPark:
                 ps.available,
                 CASE
                     WHEN ps.reserve_end IS NULL THEN 'N/A'
-                    ELSE (now() - ps.reserve_end)::STRING
+                    ELSE (ps.reserve_end - now())::STRING
                 END AS time_left
                 FROM parking_spot ps
                 JOIN parking_spot_types pst

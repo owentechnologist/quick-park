@@ -107,7 +107,7 @@ export DATABASE_URL='postgresql://root@localhost:26257/quick_park?sslmode=insecu
 cockroach sql --insecure --user=root --host=localhost --database=defaultdb
 SET CLUSTER SETTING kv.rangefeed.enabled = true;
 use quick_park;
-CREATE CHANGEFEED FOR TABLE parking_spot_alert WITH cursor='now()';
+CREATE CHANGEFEED FOR TABLE parking_spot_alert WITH mvcc_timestamp, CURSOR='now()';
 ```
 
 ### If you choose to run multiple threads in the loop option offered, you are likely to encounter an occasional exception caused by either: 
